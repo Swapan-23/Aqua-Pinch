@@ -12,6 +12,7 @@ let anthropicText = "";
 const allItems = $input.all();
 allItems.forEach(item => {
   const data = item.json;
+  
   if (data.text || data.output) {
     anthropicText = data.text || data.output;
   }
