@@ -1,7 +1,6 @@
 * **Location in repo:** Root directory (`requirements.txt`)
 * **What to do:** Create a file named `requirements.txt` and paste:
 
-
 ```text
 matplotlib>=3.5.0
 numpy>=1.21.0
