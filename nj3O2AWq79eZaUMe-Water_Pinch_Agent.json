@@ -1,0 +1,252 @@
+{
+  "name": "Water Pinch Agent",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "145dc804-a4e5-489b-8ea3-d6be1ecc77e9",
+      "name": "When clicking ‘Execute workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a senior Chemical/Process Engineer specializing in Water Pinch Analysis, Water reuse, recycling and water-network optimization.\n\nI will provide:\n- Water Pinch Analysis results (Minimum Freshwater Target, Pinch Concentration)\n- Source and sink data\n- Flow rates and contaminant concentrations\n- Maximum allowable contaminant concentration at each sink\n\n---\n### DYNAMIC INPUT DATA FROM PYTHON:\n- Minimum Freshwater Target: {{ $('Pinch Cal').item.json.min_freshwater_requirement_t_hr }} t/hr\n- Pinch Concentration: {{ $('Pinch Cal').item.json.pinch_concentration_ppm }} ppm\n- Operations Data: {{ JSON.stringify($('Pinch Cal').item.json.operations_data) }}\n---\n\nThe system contains ONE contaminant only. Your task is to analyze the network and determine how it can be modified to achieve maximum practical water savings.\n\nFollow this process:\n1. UNDERSTAND THE EXISTING NETWORK\nIdentify all sources, sinks, fresh-water streams, wastewater streams, and their flow rates.\n2. FIND POSSIBLE REUSE\nCheck every possible Source → Sink connection. A connection is feasible only if:\n- sufficient flow is available\n- the sink requirement is satisfied\n- contaminant concentration is within the sink limit\n- water and contaminant balances are satisfied\nFor mixing streams use: Cmix = Σ(Qi × Ci) / ΣQi. Do not invent missing data.\n3. FIND BETTER NETWORKS\nUsing feasible connections, create alternative water-reuse/recycle networks considering direct reuse, cascading, recycling, source splitting, sink splitting, and mixing.\n4. OPTIMIZE\nPrioritize: 1) minimum fresh-water consumption, 2) minimum wastewater discharge, 3) maximum water reuse/recycle, 4) minimum new piping, 5) minimum network complexity.\n5. RECOMMEND THE BEST CHANGE\nGive the best feasible network and clearly state:\n- Which existing connection should remain\n- Which connection should be removed/redirected\n- Which new connections should be added & the exact flow rate of each\n- Fresh-water requirement, Wastewater generation, Fresh-water saving (%), Wastewater reduction (%)\n6. SHOW THE RESULT\nProvide: EXISTING NETWORK → PROPOSED NETWORK, and describe the engineering-style water allocation network diagram.\n\nCRITICAL CONSERVATION LAWS (MANDATORY):\n1. **Node Mass Balance**: For EVERY operation, Total Water In (Freshwater + All incoming Reuse streams) MUST exactly equal that operation's required flow rate. \n2. **Global Balance**: Total Freshwater In MUST exactly equal Total Wastewater Out (since there are no water losses or generation).\n3. Do not output mismatched or fabricated flow rates. Every split and reuse stream must mathematically balance.\n\nIMPORTANT:\nDo not draw or route a connection unless it is supported by calculations. Do not call a network \"optimal\" unless it satisfies all constraints and mass balances. \n\nAt the very end of your response, you MUST output a valid JSON block enclosed in ```json and ``` tags matching this exact structure so the automated drawing tool can render it:\n\n```json\n{\n  \"freshwater_splits\": [\n    {\"to\": \"Op 1\", \"flow\": 0.0},\n    {\"to\": \"Op 2\", \"flow\": 0.0}\n  ],\n  \"reuse_streams\": [\n    {\"from\": \"Op 1\", \"to\": \"Op 2\", \"flow\": 0.0}\n  ],\n  \"wastewater_streams\": [\n    {\"from\": \"Op 1\", \"flow\": 0.0},\n    {\"from\": \"Op 2\", \"flow\": 0.0}\n  ]\n}",
+        "batching": {}
+      },
+      "id": "470986b2-65ce-42e3-b83e-f5b4adfc1f04",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        416,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-opus-5",
+          "mode": "list",
+          "cachedResultName": "Claude Opus 5"
+        },
+        "options": {
+          "maxTokensToSample": 16000,
+          "thinkingMode": "adaptive"
+        }
+      },
+      "id": "9699371b-7108-4bf4-99d8-615079d312f9",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        272,
+        176
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chart: $json.graph1_chart, format: \"base64\", width: 800, height: 500, backgroundColor: \"white\" }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "graph1_base64"
+            }
+          }
+        }
+      },
+      "id": "86df6267-fcbb-4b4a-b531-06bfb147b6f3",
+      "name": "Graph 1 (Process Streams)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        -384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://quickchart.io/chart",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chart: $json.graph2_chart, format: \"base64\", width: 800, height: 500, backgroundColor: \"white\" }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "graph2_base64"
+            }
+          }
+        }
+      },
+      "id": "7e041a34-f990-4a61-bccf-de497fac836f",
+      "name": "Graph 2 (Pinch Diagram)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 3,
+        "options": {}
+      },
+      "id": "c56074d2-676f-4bff-940b-03cabaf07f8b",
+      "name": "Graphs and Claude",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        768,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- CLEAN ORTHOGONALLY ROUTED WATER NETWORK SVG GENERATOR ---\nconst pythonData = $('Pinch Cal').first().json;\nconst ops = pythonData.operations_data || [];\nconst totalFreshwater = pythonData.min_freshwater_requirement_t_hr;\n\n// 1. Gather outputs from the merged branches\nlet graph1Url = \"\";\nlet graph2Url = \"\";\nlet graph1B64 = \"\";\nlet graph2B64 = \"\";\nlet anthropicText = \"\";\n\nconst allItems = $input.all();\nallItems.forEach(item => {\n  const data = item.json;\n  if (data.url && !graph1Url) graph1Url = data.url;\n  else if (data.url && graph1Url) graph2Url = data.url;\n  if (data.graph1_base64) graph1B64 = String(data.graph1_base64).trim();\n  if (data.graph2_base64) graph2B64 = String(data.graph2_base64).trim();\n  if (data.text || data.output) {\n    anthropicText = data.text || data.output;\n  }\n});\n\nif (!anthropicText) {\n  try {\n    anthropicText = $('Basic LLM Chain').first().json.text || $('Basic LLM Chain').first().json.output || \"\";\n  } catch(e) {}\n}\n\n// 2. Extract Dynamic JSON Routing Matrix from Anthropic's response\nlet routing = { freshwater_splits: [], reuse_streams: [], wastewater_streams: [] };\nconst jsonMatch = anthropicText.match(/```json\\s*([\\s\\S]*?)\\s*```/);\nif (jsonMatch && jsonMatch[1]) {\n  try {\n    routing = JSON.parse(jsonMatch[1]);\n  } catch(e) {}\n}\n\n// 3. Dynamically Generate SVG Layout with Routed Paths\nconst numOps = ops.length;\nconst W = Math.max(1100, numOps * 260);\nconst H = 750;\n\nfunction esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }\n\nfunction drawBox(x, y, w, h, lines, fill, stroke, color) {\n  let out = `<rect x=\"${x - w/2}\" y=\"${y - h/2}\" width=\"${w}\" height=\"${h}\" rx=\"10\" fill=\"${fill}\" stroke=\"${stroke}\" stroke-width=\"2\"/>`;\n  const lh = 18;\n  const startY = y - (lines.length - 1) * (lh / 2);\n  lines.forEach((l, i) => {\n    out += `<text x=\"${x}\" y=\"${startY + i * lh}\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"13\" fill=\"${color}\" font-weight=\"bold\">${esc(l)}</text>`;\n  });\n  return out;\n}\n\n// Straight arrow for freshwater and direct drops\nfunction drawStraightArrow(x1, y1, x2, y2, color, label, labelOffsetX = 0, labelOffsetY = -8) {\n  const id = 'arr_' + color.replace('#', '');\n  let out = `<line x1=\"${x1}\" y1=\"${y1}\" x2=\"${x2}\" y2=\"${y2}\" stroke=\"${color}\" stroke-width=\"2\" marker-end=\"url(#${id})\"/>`;\n  if (label !== undefined && label !== null) {\n    const mx = (x1 + x2) / 2 + labelOffsetX;\n    const my = (y1 + y2) / 2 + labelOffsetY;\n    out += `<text x=\"${mx}\" y=\"${my}\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"11\" fill=\"${color}\" font-weight=\"bold\">${esc(label)}</text>`;\n  }\n  return out;\n}\n\n// Routed orthogonal path for reuse/bypass lines to prevent box overlap\nfunction drawRoutedPath(x1, y1, x2, y2, color, label, routingOffset = 0) {\n  const id = 'arr_' + color.replace('#', '');\n  const baseRouteY = 360 + routingOffset; // Distinct vertical channel below boxes\n  \n  // Orthogonal path: Down from source -> Horizontal across channel -> Up to destination\n  const pathData = `M ${x1} ${y1} L ${x1} ${baseRouteY} L ${x2} ${baseRouteY} L ${x2} ${y2}`;\n  \n  let out = `<path d=\"${pathData}\" fill=\"none\" stroke=\"${color}\" stroke-width=\"2\" marker-end=\"url(#${id})\"/>`;\n  \n  if (label !== undefined && label !== null) {\n    // Place label neatly along the horizontal segment of the routed path\n    const midX = (x1 + x2) / 2;\n    out += `<text x=\"${midX}\" y=\"${baseRouteY - 5}\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"11\" fill=\"${color}\" font-weight=\"bold\">${esc(label)}</text>`;\n  }\n  return out;\n}\n\nlet svgElements = '';\nlet defs = '<defs>';\n['#0284c7', '#333333', '#ea580c'].forEach(c => {\n  defs += `<marker id=\"arr_${c.replace('#', '')}\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0,0 L8,4 L0,8 z\" fill=\"${c}\"/></marker>`;\n});\ndefs += '</defs>';\n\n// Title\nsvgElements += `<text x=\"${W/2}\" y=\"35\" text-anchor=\"middle\" font-family=\"Arial, sans-serif\" font-size=\"18\" font-weight=\"bold\" fill=\"#1e293b\">Dynamic Proposed Water Allocation Network</text>`;\n\n// Freshwater Header Box\nconst fwX = W / 2;\nconst fwY = 90;\nsvgElements += drawBox(fwX, fwY, 180, 50, ['Freshwater Supply', `${totalFreshwater} t/hr`], '#e0f2fe', '#0284c7', '#0369a1');\n\n// Operation Boxes\nconst opCoords = {};\nconst spacing = W / (numOps + 1);\nconst opY = 250;\n\nops.forEach((o, i) => {\n  const opName = `Op ${o.op}`;\n  const opX = spacing * (i + 1);\n  opCoords[opName] = { x: opX, y: opY };\n  svgElements += drawBox(opX, opY, 130, 65, [`Operation ${o.op}`, `${o.flow} t/hr`], '#d8f3dc', '#2d6a4f', '#1b4332');\n});\n\n// Wastewater Box\nconst wwX = W / 2;\nconst wwY = 600;\nsvgElements += drawBox(wwX, wwY, 220, 50, ['Wastewater Collection', `${totalFreshwater} t/hr`], '#ffedd5', '#ea580c', '#c2410c');\n\n// 1. Draw Freshwater Splits (Top fan-out)\n(routing.freshwater_splits || []).forEach((item, index) => {\n  const target = opCoords[item.to];\n  if (target) {\n    const offsetX = (index - (numOps - 1) / 2) * 40;\n    svgElements += drawStraightArrow(fwX, fwY + 25, target.x, target.y - 32.5, '#0284c7', `${item.flow} t/hr`, offsetX, -5);\n  }\n});\n\n// 2. Draw Reuse Streams using Clean Downward Routed Paths (Side-by-side channels)\n(routing.reuse_streams || []).forEach((item, index) => {\n  const src = opCoords[item.from];\n  const dst = opCoords[item.to];\n  if (src && dst) {\n    // Route from bottom of source operation to bottom of destination operation, offset vertically per stream\n    const routingOffset = index * 22; \n    svgElements += drawRoutedPath(src.x, src.y + 32.5, dst.x, dst.y + 32.5, '#333333', `${item.flow} t/hr`, routingOffset);\n  }\n});\n\n// 3. Draw Wastewater Discharges (Fan-in to bottom box)\nconst allWW = routing.wastewater_streams || [];\nallWW.forEach((item, index) => {\n  const src = opCoords[item.from];\n  if (src) {\n    const targetWWX = wwX - 70 + (140 / Math.max(1, allWW.length - 1)) * index;\n    const labelShiftX = (index - (allWW.length - 1) / 2) * 25;\n    svgElements += drawStraightArrow(src.x, src.y + 32.5, targetWWX, wwY - 25, '#ea580c', `${item.flow} t/hr`, labelShiftX, 5);\n  }\n});\n\nconst finalSvg = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${W}\" height=\"${H}\" viewBox=\"0 0 ${W} ${H}\">${defs}<rect width=\"100%\" height=\"100%\" fill=\"#ffffff\"/>${svgElements}</svg>`;\nconst networkSvgB64 = Buffer.from(finalSvg, 'utf8').toString('base64');\n\nreturn [{\n  json: {\n    \"1_Graph_1_URL\": graph1Url || \"\",\n    \"2_Graph_2_URL\": graph2Url || \"\",\n    \"3_Anthropic_Analysis_Text\": anthropicText,\n    \"4_Dynamic_Network_SVG_Base64\": networkSvgB64\n  },\n  binary: {\n    ...(graph1B64 ? { graph1: { data: graph1B64, mimeType: 'image/png', fileName: 'graph1.png', fileExtension: 'png' } } : {}),\n    ...(graph2B64 ? { graph2: { data: graph2B64, mimeType: 'image/png', fileName: 'graph2.png', fileExtension: 'png' } } : {}),\n    network_diagram: {\n      data: networkSvgB64,\n      mimeType: 'image/svg+xml',\n      fileName: 'dynamic_water_network.svg',\n      fileExtension: 'svg'\n    }\n  }\n}];"
+      },
+      "id": "f8156559-fb45-419c-88d7-af8172a6c6b9",
+      "name": "Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Pure Python (no imports): the n8n Cloud Python runner blocks all imports.\n\noperations = [\n    {\"op\": 1, \"mass\": 3.0, \"cin\": 0, \"cout\": 200, \"flow\": 15.0},\n    {\"op\": 2, \"mass\": 5.0, \"cin\": 60, \"cout\": 200, \"flow\": 35.7},\n    {\"op\": 3, \"mass\": 25.0, \"cin\": 60, \"cout\": 400, \"flow\": 73.53},\n    {\"op\": 4, \"mass\": 6.0, \"cin\": 500, \"cout\": 800, \"flow\": 20.0}\n]\n\nconc_intervals = [0, 60, 200, 400, 500, 800]\ncum_mass = 0.0\nmax_target_flow = 0.0\npinch_conc = 0\ncum_mass_list = [0.0]\ntarget_flows = [0.0]\n\nfor i in range(len(conc_intervals) - 1):\n    c_low = conc_intervals[i]\n    c_high = conc_intervals[i + 1]\n    delta_c = c_high - c_low\n\n    # An operation is active across the whole interval when it spans it (inclusive bounds)\n    active_flow = 0.0\n    for op in operations:\n        if op[\"cin\"] <= c_low and op[\"cout\"] >= c_high:\n            active_flow += op[\"flow\"]\n\n    interval_mass = (active_flow * delta_c) / 1000.0\n    cum_mass += interval_mass\n    cum_mass_list.append(cum_mass)\n\n    target_flow = (cum_mass * 1000.0) / c_high\n    target_flows.append(target_flow)\n\n    if target_flow > max_target_flow:\n        max_target_flow = target_flow\n        pinch_conc = c_high\n\n# --- Graph 1: Process Streams Profile (chart config for QuickChart) ---\ncolors = [\"#1f77b4\", \"#ff7f0e\", \"#2ca02c\", \"#d62728\"]\ng1_datasets = []\ncurrent_m = 0.0\nfor idx, op in enumerate(operations):\n    m_start = current_m\n    m_end = current_m + op[\"mass\"]\n    g1_datasets.append({\n        \"label\": \"Op \" + str(op[\"op\"]),\n        \"data\": [{\"x\": round(m_start, 3), \"y\": op[\"cin\"]}, {\"x\": round(m_end, 3), \"y\": op[\"cout\"]}],\n        \"showLine\": True,\n        \"fill\": False,\n        \"borderColor\": colors[idx % len(colors)],\n        \"backgroundColor\": colors[idx % len(colors)],\n        \"pointRadius\": 5,\n        \"borderWidth\": 2\n    })\n    current_m = m_end\n\ngraph1_chart = {\n    \"type\": \"scatter\",\n    \"data\": {\"datasets\": g1_datasets},\n    \"options\": {\n        \"title\": {\"display\": True, \"text\": \"Graph 1: Process Streams Profile (C vs Mass Load)\"},\n        \"scales\": {\n            \"xAxes\": [{\"scaleLabel\": {\"display\": True, \"labelString\": \"Mass Load (kg/hr)\"}}],\n            \"yAxes\": [{\"scaleLabel\": {\"display\": True, \"labelString\": \"C (ppm)\"}}]\n        }\n    }\n}\n\n# --- Graph 2: Limiting Composite Curve + Water Supply Line ---\npinch_mass = cum_mass_list[conc_intervals.index(pinch_conc)] if pinch_conc in conc_intervals else 0.0\nsupply_end_c = (cum_mass_list[-1] * 1000.0) / max_target_flow if max_target_flow > 0 else 0.0\n\ncomposite = []\nfor k in range(len(conc_intervals)):\n    composite.append({\"x\": round(cum_mass_list[k], 3), \"y\": conc_intervals[k]})\n\ngraph2_chart = {\n    \"type\": \"scatter\",\n    \"data\": {\"datasets\": [\n        {\"label\": \"Limiting Composite Curve\", \"data\": composite, \"showLine\": True, \"fill\": False,\n         \"borderColor\": \"#1f77b4\", \"backgroundColor\": \"#1f77b4\", \"borderWidth\": 2, \"pointRadius\": 4},\n        {\"label\": \"Water Supply Line\", \"data\": [{\"x\": 0, \"y\": 0}, {\"x\": round(cum_mass_list[-1], 3), \"y\": round(supply_end_c, 2)}],\n         \"showLine\": True, \"fill\": False, \"borderColor\": \"#d62728\", \"borderDash\": [6, 4], \"borderWidth\": 2, \"pointRadius\": 0},\n        {\"label\": \"Pinch Point (\" + str(pinch_conc) + \" ppm)\", \"data\": [{\"x\": round(pinch_mass, 3), \"y\": pinch_conc}],\n         \"showLine\": False, \"borderColor\": \"#d62728\", \"backgroundColor\": \"#d62728\", \"pointRadius\": 8}\n    ]},\n    \"options\": {\n        \"title\": {\"display\": True, \"text\": \"Graph 2: Water Pinch Analysis (Min Freshwater = \" + str(round(max_target_flow, 2)) + \" t/hr)\"},\n        \"scales\": {\n            \"xAxes\": [{\"scaleLabel\": {\"display\": True, \"labelString\": \"Cumulative Mass Load (kg/hr)\"}}],\n            \"yAxes\": [{\"scaleLabel\": {\"display\": True, \"labelString\": \"C (ppm)\"}}]\n        }\n    }\n}\n\nreturn [{\n    \"json\": {\n        \"min_freshwater_requirement_t_hr\": round(max_target_flow, 2),\n        \"pinch_concentration_ppm\": pinch_conc,\n        \"concentration_intervals\": conc_intervals,\n        \"cumulative_mass_kg_hr\": [round(m, 3) for m in cum_mass_list],\n        \"target_flows_t_hr\": [round(f, 2) for f in target_flows],\n        \"operations_data\": operations,\n        \"graph1_chart\": graph1_chart,\n        \"graph2_chart\": graph2_chart\n    }\n}]"
+      },
+      "id": "a3e0986e-a7ac-471d-885f-b4184539356c",
+      "name": "Pinch Cal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        -192
+      ]
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Pinch Cal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Graphs and Claude",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Graph 1 (Process Streams)": {
+      "main": [
+        [
+          {
+            "node": "Graphs and Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Graph 2 (Pinch Diagram)": {
+      "main": [
+        [
+          {
+            "node": "Graphs and Claude",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Graphs and Claude": {
+      "main": [
+        [
+          {
+            "node": "Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinch Cal": {
+      "main": [
+        [
+          {
+            "node": "Graph 1 (Process Streams)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Graph 2 (Pinch Diagram)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 0,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
