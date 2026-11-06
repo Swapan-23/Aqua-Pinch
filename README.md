@@ -6,7 +6,7 @@
 ---
 
 ##  Overview
-Traditional Water Pinch Analysis relies on manual source-sink stream matching across hundreds of piping permutations—a slow, error-prone workflow that delays industrial water reuse. 
+Traditional Water Pinch Analysis relies on manual source-sink stream matching across hundreds of piping permutations a slow, error-prone workflow that delays industrial water reuse. 
 
 **AQUA PINCH** bridges this execution gap by combining Python-based mathematical targeting algorithms with Large Language Models (Claude/DeepSeek), seamlessly orchestrated via **n8n**. The framework converts complex theoretical mass balance data into deployable physical water routing networks in under **10–12 minutes**.
 
